@@ -1,63 +1,124 @@
 import fs from 'fs';
-const input = fs.readFileSync('input.txt').toString().trim().split('\n').map((line) => line.replace(/\s+/g, '').split('->').map((xy) => xy.split(',').map((n) => parseInt(n))))
+const input = fs.readFileSync('input.txt').toString().trim().split('\n\n')
+const numbers = input.shift().split(',').map(n => parseInt(n))
+const boards = input.map((board) => board.split('\n')).map((board) => {
+  return board.map((row) => row.trim().split(/\s+/).map(n => parseInt(n)))
+})
 
-// Part 1 Solution
-const getStraightLines = (lines) => lines.filter(line => line[0][0] === line[1][0] || line[0][1] === line[1][1])
-const getDiagonalLines = (lines) => lines.filter((line) => 
-  line[0][0] > line[1][0] && line[0][1] > line[1][1] || line[0][0] < line[1][0] && line[0][1] < line[1][1]
-    ? line[0][0] - line[1][0] === line[0][1] - line[1][1]
-    : line[1][0] - line[0][0] === line[0][1] - line[1][1]
-)
+const checkBoard = (index, marks) => {
+  const x = []
+  const y = []
+  let countX = {}
+  let countY = {}
+  let bingo = false
 
-const findPoints = (lines) => {
-  const points = []
-  for (const line of lines) {
-    if(line[0][0] !== line[1][0] && line[0][1] === line[1][1]) {
-      const y = line[0][1]
-      const start = line[0][0] < line[1][0] ? line[0][0] : line[1][0]
-      const end = line[0][0] < line[1][0] ? line[1][0] : line[0][0]
-      for (let x = start; x <= end; x++) {
-        points.push([x, y])
+  if(marks[index]) {
+    for (let i = 0; i < marks[index].length; i++) {
+      x.push(marks[index][i][0])
+      y.push(marks[index][i][1])
+    }
+  }
+  for (const num of x) { 
+    countX[num] = countX[num] ? countX[num] + 1 : 1 
+    for (let i = 0; i < 5 && !bingo; i++) {
+      if(countX[i] >= 5) bingo = { x: countX[i] }
+    }
+  }
+  for (const num of y) { 
+    countY[num] = countY[num] ? countY[num] + 1 : 1 
+    for (let i = 0; i < 5 && !bingo; i++) {
+      if(countY[i] >= 5) bingo = { y: countY[i] }
+    }
+  }
+  return bingo
+}
+
+const findFirstWinner = (numbers, boards) => {
+  const called = []
+  const marks = {}
+  let bingo = false
+  let winner = {}
+
+  for (let i = 0; i < numbers.length && !bingo; i++) {
+    called.push(numbers[i])
+    for (const [boardIndex, board] of boards.entries()) {
+      for (const [rIdx, row] of board.entries()) {
+        for (const [column, n] of row.entries()) {
+          if(numbers[i] === n) {
+            marks[boardIndex] ? marks[boardIndex].push([rIdx, column]) : marks[boardIndex] = [[rIdx, column]]
+            break
+          }
+        }
       }
-    } else if(line[0][0] === line[1][0] && line[0][1] !== line[1][1]) {
-      const x = line[0][0]
-      const start = line[0][1] < line[1][1] ? line[0][1] : line[1][1]
-      const end = line[0][1] < line[1][1] ? line[1][1] : line[0][1]
-      for (let y = start; y <= end; y++) {
-        points.push([x, y])
-      }
-    } else {
-      const increase = line[0][0] > line[1][0] && line[0][1] > line[1][1] || line[0][0] < line[1][0] && line[0][1] < line[1][1]
-      let start = line[0][0] > line[1][0] ? line[1][0] : line[0][0]
-      let end = line[0][0] > line[1][0] ? line[0][0] : line[1][0]
-      let y = increase 
-        ? line[0][1] > line[1][1] ? line[1][1] : line[0][1]
-        : line[0][1] > line[1][1] ? line[0][1] : line[1][1]
-      for (let x = start; x <= end; x++) {
-        points.push([x, y])
-        increase ? y++ : y--
+      const result = checkBoard(boardIndex, marks)
+      if(result) {
+        bingo = true
+        winner.line = result
+        winner.index = boardIndex
+        winner.board = board
+        winner.marks = marks[boardIndex]
+        winner.lastCalled = called.pop()
+        break
       }
     }
   }
-  return points
+  return winner
 }
 
-const findIntersections = (points) => {
-  const intersections = {};
-  for (const point of points) {
-    intersections[point] = intersections[point] ? intersections[point] + 1 : 1;
-  }
-  return intersections
+const getScore = (winner) => {
+  return winner.board.map((row, index) => {
+    const marks = winner.marks.map(mark => {
+      if(mark[0] === index) {
+        return mark[1]
+      }
+    }).filter(mark => mark !== undefined)
+    const filtered = row.filter((n, i) => !marks.includes(i))
+    if(filtered.length) {
+      return filtered.reduce((acc, curr) => acc+curr)
+    } 
+  }).filter((total) => total !== undefined).reduce((acc, curr) => acc+curr)*winner.lastCalled
 }
 
-const straightLines = getStraightLines(input)
-const p1_points = findPoints(straightLines)
-const p1_intersections =  findIntersections(p1_points)
-
-console.log(`part 1: ${Object.values(p1_intersections).filter((count) => count >= 2).length}`)
+const firstWinner = findFirstWinner(numbers, boards)
+const score = getScore(firstWinner)
+console.log(`part 1: ${score}`)
 
 // Part 2 Solution
-const allLines = [...getStraightLines(input), ...getDiagonalLines(input)]
-const p2_points = findPoints(allLines)
-const p2_intersections =  findIntersections(p2_points)
-console.log(`part 2: ${Object.values(p2_intersections).filter((count) => count >= 2).length}`)
+const findLastWinner = (numbers, boards) => {
+  const totalBoards = boards.length
+  const called = []
+  const marks = {}
+  let bingoCount = 0
+  let bingoBoards = []
+  let winner = {}
+
+  for (let i = 0; i < numbers.length && bingoBoards.length !== totalBoards; i++) {
+    called.push(numbers[i])
+    for (const [boardIndex, board] of boards.entries()) {
+      for (const [rIdx, row] of board.entries()) {
+        for (const [column, n] of row.entries()) {
+          if(numbers[i] === n) {
+            marks[boardIndex] ? marks[boardIndex].push([rIdx, column]) : marks[boardIndex] = [[rIdx, column]]
+            break
+          }
+        }
+      }
+      if(checkBoard(boardIndex, marks) && !bingoBoards.includes(boardIndex)) {
+        bingoBoards.push(boardIndex)
+      }
+      if(bingoBoards.length === totalBoards) {
+        winner.line = checkBoard(boardIndex, marks)
+        winner.index = boardIndex
+        winner.board = board
+        winner.marks = marks[boardIndex]
+        winner.lastCalled = called.pop()
+        break
+      }
+    }
+  }
+  return winner
+}
+
+const lastWinner = findLastWinner(numbers, boards)
+const score2 = getScore(lastWinner)
+console.log(`part 2: ${score2}`)
