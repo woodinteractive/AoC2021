@@ -63,7 +63,6 @@ const getOutputValues = (input) => {
   const results = []
   for (const row of input) {
     const signalPattern = mapSignalPattern(row.signal)
-    // console.log(row, signalPattern)
     const num = row.output.reduce((number, digit) => {
       const r = RegExp(`\\b[${digit}]{${digit.length}}\\b`, 'g')
       const n = Object.keys(signalPattern).find(key => r.test(signalPattern[key]))
